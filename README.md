@@ -1,2 +1,2 @@
 # Snake_game
-Upgraded snake game in VHDL and assembly
+Upgraded snake game in VHDL and Assembly
