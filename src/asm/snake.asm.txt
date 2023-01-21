@@ -28,12 +28,12 @@
 ; Anastasija Terzic		IN44/2021
 ; Ognjen Stancevic		IN53/2021
 
-; - Dodate provere za umiranje:
-;   zidovi
-;   rep
-; - Dotada randomizacija hrane
-; - Dodato novo dugme
-; - Dodat restart igrice preko novog dugmeta
+; - Upgrades:
+;   walls
+;   death if eating its own body
+;   food randomization
+; 	reset button
+; 	game reset by pressing the button
 
 
 .data
@@ -43,8 +43,8 @@
 0x100
 0x140
 0x200
-6515	; Vrednost za randomizaciju X koordinate
-4209	; Vrednost za randomizaciju Y koordinate
+6515	; value for random x coordinate
+4209	; value for random y coordinate
 3, 4
 2, 4
 2, 3
@@ -55,7 +55,7 @@
 
 .text
 /*
-	Spisak registara:
+	Registers:
 	R0 - tmp register
 	R1 - tmp chunk x
 	R2 - tmp chunk y
@@ -92,39 +92,23 @@ frame_sync_wait_1:
 	jmpz frame_sync_wait_1
 
 ;;---------------------------------------
-
-;; test dugmeta
-; test:
-; 	sub R0, R0, R0
-; 	inc R5, R5
-; 	inc R5, R5
-; 	ld R1, R5
-; 	dec R5, R5
-; 	dec R5, R5
-
-; 	sub R0, R1, R0
-; 	jmpz kraj
-
-
-
-;;---------------------------------------
-;; PROVERA IZLASKA SA MAPE
-check_top_left:			;; PROVERA GORNJE I LEVE IVICE
+;; WALLS
+check_top_left:			
 	sub R0, R0, R0		; R0 = 0
 	ld R4, R0			
 	inc R4, R4
 	inc R4, R4			; R4 -> snakeHead X
 	ld R1, R4
-	jmps kraj			; Da li je izasla levo (X < 0)
+	jmps kraj			; out of bounds-left (X < 0)
 	
 	inc R4, R4			; R4 -> snakeHead Y
 	ld R2, R4
-	jmps kraj			; Da li je izasla gore (Y < 0)
+	jmps kraj			; out of bounds-up (Y < 0)
 	
 	inc R4, R4
 	
 
-check_bottom_right:		;; PROVERA DONJE I DESNE IVICE
+check_bottom_right:		
 	sub R0,R0,R0		; R0 = 0
 	ld R4,R0
 	inc R4,R4
@@ -143,13 +127,13 @@ check_bottom_right:		;; PROVERA DONJE I DESNE IVICE
 	inc R0,R0			; R0 = 7
 
 	sub R1,R0,R1
-	jmps kraj			; Da li je izasla ka dole
+	jmps kraj			; out of bounds-down
 	
 	sub R2,R0,R2
-	jmps kraj			; Da li je izasla ka desno
+	jmps kraj			; out of bounds-right
 
 ;;---------------------------------------
-;; PROVERA KOLIZIJE SA REPOM
+;; Eating thyself check
 rep:
     sub R0, R0, R0		; R0 = 0
     ld R4, R0
@@ -161,21 +145,21 @@ rep:
     inc R4, R4			; R4 -> first tail X
 
 rep_loop:
-	;; PROVERA DA LI JE KRAJ REPA
+	;; is_end_tail ?
     ld R0, R4
-    jmps dalje                  ; Kraj repa (ako smo dosli do -1)
+    jmps dalje          ; end of tail if -1
 
-	;; PROVERA DA LI SU X REPA I GLAVE ISTI
+	;;check if tail[x] & head[x] are same
     sub R0, R0, R1
-    jmpnz nije_jedan            ; Nije isto X
+    jmpnz nije_jedan    ;not same x
 
-	;; PROVERA DA LI SU Y REPA I GLAVE ISTI
+	;; check if tail[y] & head[y] are same
     inc R4, R4
     ld R0, R4
     sub R0, R0, R2
-    jmpnz nije_dva              ;; Nije isto Y
+    jmpnz nije_dva       ; not same y
 
-    jmp kraj          			;; Skace na kraj ako su obe koordinate iste
+    jmp kraj          			
 
 
 nije_jedan:
@@ -336,11 +320,11 @@ eating_food_end:
 jmp frame_sync_rising_edge
 
 ;;------------------------------------
-;; ZAVRSETAK IGRE
+;; GAME END
 kraj:
 
 	sub R0, R0, R0			; R0 = 0
-	mov R6, R0				; R6 = 0 (koristimo ga kao seed za randomizaciju)(seed)
+	mov R6, R0				; R6 = 0 randomization seed
 
 kraj_loop:
 
@@ -355,26 +339,25 @@ kraj_loop:
 	mov R1, R0
 	mov R2, R0
 
-	;; Koristimo R4[0] i R4[1] za cuvanje trenutnih koordinata dok se R1 i R2 koriste za druge stvari
 	st R0, R4
 	inc R4, R4
 	st R0, R4
 
-;; ISPIS PO CELOM MATRIXU
+;; Write on matrix
 reset:
 	sub R0, R0, R0			; R0 = 0
 
 
-	;; ISPIS
+	;; write sequence
 	shl R2, R2
 	shl R2, R2
 	shl R2, R2
 	add R2, R1, R2
 	add R2, R7, R2
-	st R3, R2				; Obojena trenutna koordinata na matrixu
+	st R3, R2		
 
 
-	;; Upis i R1 i R2 iz sacuvanih vrednosti u R4[0] i R4[1]
+
 	sub R0, R0, R0
 	ld R4, R0
 	ld R1, R4
@@ -398,7 +381,7 @@ reset:
 	inc R0, R0				; R0 = 7
 
 	sub R0, R0, R1
-	jmpns reset				; Da li je dosao do kraja desno (po X)
+	jmpns reset				; out of bounds right(x)
 
 	;; Dosao je do kraja po X -> prelazi na sledeci red
 
@@ -420,32 +403,24 @@ reset:
 	inc R0, R0				; R0 = 7
 
 	sub R0, R0, R2
-	jmpns reset				; Da li je dosao do kraja ka dole (po Y)
+	jmpns reset				; out of bounds right(y)
 
 
-	;; Provera da li je igrica restartovana
+	;; check if game is reset
 	sub R0, R0, R0
 	inc R5, R5
-	inc R5, R5				; R5 -> RST dugme
+	inc R5, R5				; R5 -> RST button
 	ld R1, R5
 	dec R5, R5
 	dec R5, R5
 	sub R0, R1, R0
-	jmpnz new_begin			; Da li je RST pritisnuto
+	jmpnz new_begin			;RST pressed ?
 	
-	inc R6, R6				; R6++ brojac za randomizaciju lokacije hrane(seed)
+	inc R6, R6				; R6++
 jmp kraj_loop
 
-;; FUNKCIJA ZA PONOVNO POKRETANJE IGRE
 new_begin:
-	;;-------------------
-	;; RANDOMIZACIJA HRANE
-
-	;; Imamo seed vrednost koja se vrti sve dok korisnik ne klikne dugme
-	;; Kada korisnik klikne dugme vrednost prestaje da se broji i belezi se
-	;; Vrednost sabiramo sa razlicitim konstantama za X i Y koodrinate
-	;; U R0 pravimo masku da bi uzeli samo prva tri bita te vrednosti(da bi dobili broj izmedju 0-7)
-	;; Te dobijene vrednosti se beleze u niz za koordinate (R4[0] i R4[1])
+	;; FOOD RANDOMIZATION
 
 	sub R0, R0, R0			; R0 = 0
 	inc R0, R0
@@ -454,13 +429,7 @@ new_begin:
 	inc R0, R0
 	inc R0, R0
 	inc R0, R0				; R0 = 6
-	;; 0000 0000 0000 0111
-	;; 0001 1010 1101 0100
-	;; 0000 0000 0000 0100
 
-	;; 0000 0000 0000 0111
-	;; 0001 0001 1101 0101
-	;; 0000 0000 0000 0101
 	ld R1, R0				; R1 = konstanta na lokaciji sa R0
 	add R1, R6, R1			; R1 = R1 + seed
 	inc R0, R0				; R0 = 7
@@ -472,12 +441,12 @@ new_begin:
 	
 	sub R0, R0, R0
 	ld R4, R0
-	st R1, R4				; R4[0] = random X hrane
+	st R1, R4				; R4[0] = food random X 
 	inc R4, R4
-	st R2, R4				; R4[1] = random Y hrane
+	st R2, R4				; R4[1] = food random Y 
 	
 	;;-------------------
-	; POSTAVLJANJE POCETNIH VREDNOSTI ZA ZMIJICU
+	; snake values after restart
 
 	sub R0, R0, R0			; R0 = 0
 	ld R4, R0
@@ -524,6 +493,6 @@ new_begin:
 	inc R0, R0
 	inc R0, R0
 	inc R0, R0
-	ld R6, R0				; Vracanje R6 na p_frame_sync
+	ld R6, R0				
 	
-	jmp begin				; Ponovo pokretanje porgrama
+	jmp begin				
